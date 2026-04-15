@@ -17,4 +17,6 @@ Thumbs.db
 
 # Database
 *.json
-!nukeno/backend/db/data.json
+!backend/db/data.json
+!frontend/package.json
+!package.json
