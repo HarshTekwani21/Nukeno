@@ -1,10 +1,10 @@
-# Render.com Blueprint
+# Render.com Blueprint - Nukeno AI Assistant
 # Deploy both backend and frontend services
 
 services:
   # Backend API Service
   - type: web
-    name: nukeno-api
+    name: nukeno-backend
     env: python
     region: oregon
     rootDir: backend
@@ -17,24 +17,27 @@ services:
       - key: PYTHON_VERSION
         value: "3.11"
 
-  # Frontend Static Site
+  # Frontend Static Site (React SPA)
   - type: web
     name: nukeno-frontend
     env: static
     region: oregon
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    buildCommand: |
+      npm install
+      npm run build
+      echo "/* /index.html 200" > dist/_redirects
     staticPublishPath: dist
     headers:
-      - path: /*
+      - path: /static/*
         name: Cache-Control
-        value: public, max-age=0, must-revalidate
-    routes:
-      - path: /
-        destination: /index.html
+        value: public, max-age=31536000, immutable
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
     envVars:
       - key: VITE_API_URL
         fromService:
           type: web
-          name: nukeno-api
+          name: nukeno-backend
           envVarKey: RENDER_EXTERNAL_URL
