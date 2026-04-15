@@ -31,7 +31,7 @@ class WhisperService:
             print(f"Failed to load Whisper model: {e}")
             return None
 
-    def transcribe(self, audio_file: BinaryIO, language: str = "en") -> Optional[str]:
+    def transcribe(self, audio_data, language: str = "en") -> Optional[str]:
         model = self._get_model()
         
         if model is None:
@@ -39,13 +39,16 @@ class WhisperService:
         
         tmp_path = None
         try:
-            audio_data = audio_file.read()
+            if hasattr(audio_data, 'read'):
+                audio_bytes = audio_data.read()
+            else:
+                audio_bytes = audio_data
             
-            if len(audio_data) < 1000:
+            if len(audio_bytes) < 1000:
                 return None
             
             with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
-                tmp.write(audio_data)
+                tmp.write(audio_bytes)
                 tmp_path = tmp.name
 
             segments, info = model.transcribe(
@@ -69,35 +72,6 @@ class WhisperService:
             
         except Exception as e:
             print(f"Transcription error: {e}")
-            return None
-            
-        finally:
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except:
-                    pass
-
-    def transcribe_streaming(self, audio_chunks: list) -> Optional[str]:
-        model = self._get_model()
-        
-        if model is None:
-            return None
-        
-        tmp_path = None
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                for chunk in audio_chunks:
-                    tmp.write(chunk)
-                tmp_path = tmp.name
-
-            segments, _ = model.transcribe(tmp_path, language="en")
-            text = " ".join([s.text.strip() for s in segments])
-            
-            return text.strip() if text.strip() else None
-            
-        except Exception as e:
-            print(f"Streaming transcription error: {e}")
             return None
             
         finally:
