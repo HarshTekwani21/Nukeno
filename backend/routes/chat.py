@@ -44,7 +44,8 @@ async def chat(request: ChatRequest):
         
         await session_manager.add_message(session_id, "assistant", response)
         
-        if any(keyword in request.message.lower() for keyword in ["remind me", "add task", "create task", "remember to", "don't forget", "todo", "task:", "i need to", "i should"]):
+        keywords = ["remind me", "add task", "create task", "remember to", "don't forget", "todo", "task:", "i need to", "i should"]
+        if any(keyword in request.message.lower() for keyword in keywords):
             try:
                 tasks_extracted = context_service.extract_and_save_tasks(request.message)
             except Exception as e:
