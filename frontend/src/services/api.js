@@ -15,6 +15,7 @@ class APIClient {
     this.timeout = 30000
     this.retries = 3
     this.retryDelay = 1000
+    this.sessionId = `session_${Date.now()}`
   }
 
   async request(endpoint, options = {}) {
@@ -80,14 +81,18 @@ class APIClient {
     return new Promise(resolve => setTimeout(resolve, ms))
   }
 
-  async chat(message) {
+  async chat(message, sessionId = null) {
     return this.request('/chat', {
       method: 'POST',
-      body: { message, use_context: true }
+      body: { 
+        message, 
+        use_context: true,
+        session_id: sessionId || this.sessionId
+      }
     })
   }
 
-  async voiceChat(audioBlob) {
+  async voiceChat(audioBlob, sessionId = null) {
     const formData = new FormData()
     formData.append('audio', audioBlob, `audio_${Date.now()}.wav`)
     

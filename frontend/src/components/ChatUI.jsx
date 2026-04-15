@@ -11,6 +11,7 @@ const ChatUI = () => {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState('checking')
   const [tasksExtracted, setTasksExtracted] = useState([])
+  const [messageCount, setMessageCount] = useState(0)
   
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -249,7 +250,7 @@ const ChatUI = () => {
           <div>
             <h2 className="text-white font-semibold">Nukeno Assistant</h2>
             <p className="text-xs text-gray-500">
-              {connectionStatus === 'connected' ? 'Connected' : 
+              {connectionStatus === 'connected' ? `${messages.length} messages • Connected` : 
                connectionStatus === 'error' ? 'Connection error' : 'Connecting...'}
             </p>
           </div>

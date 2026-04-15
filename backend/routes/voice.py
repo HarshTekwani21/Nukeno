@@ -18,17 +18,17 @@ async def voice_chat(audio: UploadFile = File(...)):
         if len(audio_data) < 1000:
             return {
                 "transcript": "",
-                "response": "Audio too short. Try again.",
+                "response": "Audio was too short. Try speaking a bit longer!",
                 "audio_data": None,
                 "error": "Audio too short"
             }
         
         transcript = whisper_service.transcribe(audio_data)
         
-        if not transcript or len(transcript.strip()) < 2:
+        if not transcript or len(transcript.strip()) < 3:
             return {
                 "transcript": "",
-                "response": "I couldn't understand that. Could you repeat?",
+                "response": "Couldn't catch that. Could you repeat? Make sure your mic is clear.",
                 "audio_data": None,
                 "error": "No speech detected"
             }
@@ -38,9 +38,9 @@ async def voice_chat(audio: UploadFile = File(...)):
             response = gemini_service.generate_response(transcript, context)
         except Exception as e:
             print(f"Response generation error: {e}")
-            response = "I'm having trouble generating a response. Please try again."
+            response = "I'm having trouble responding. Give me another try!"
         
-        if any(keyword in transcript.lower() for keyword in ["remind", "add task", "create task", "todo", "remember"]):
+        if any(keyword in transcript.lower() for keyword in ["remind", "add task", "create task", "todo", "remember", "need to", "should"]):
             try:
                 context_service.extract_and_save_tasks(transcript)
             except Exception as e:

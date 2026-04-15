@@ -3,21 +3,28 @@ from pydantic import BaseModel
 from typing import Optional, List
 from services.gemini_service import gemini_service
 from services.context_service import context_service
+from services.session_manager import session_manager
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = "default"
     use_context: bool = True
 
 class ChatResponse(BaseModel):
     response: str
     tasks_extracted: List[dict] = []
     context_used: bool = False
+    session_id: str = "default"
 
 @router.post("", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
+        session_id = request.session_id or "default"
+        
+        await session_manager.add_message(session_id, "user", request.message)
+        
         context = None
         tasks_extracted = []
         
@@ -28,12 +35,16 @@ async def chat(request: ChatRequest):
                 print(f"Context loading error: {e}")
         
         try:
-            response = gemini_service.generate_response(request.message, context)
+            history = await session_manager.get_history(session_id)
+            history_str = session_manager.format_history_for_prompt(history)
+            response = gemini_service.generate_response(request.message, context, history_str)
         except Exception as e:
             print(f"Gemini error: {e}")
             raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
         
-        if any(keyword in request.message.lower() for keyword in ["remind me", "add task", "create task", "remember to", "don't forget", "todo"]):
+        await session_manager.add_message(session_id, "assistant", response)
+        
+        if any(keyword in request.message.lower() for keyword in ["remind me", "add task", "create task", "remember to", "don't forget", "todo", "task:", "i need to", "i should"]):
             try:
                 tasks_extracted = context_service.extract_and_save_tasks(request.message)
             except Exception as e:
@@ -42,7 +53,8 @@ async def chat(request: ChatRequest):
         return ChatResponse(
             response=response,
             tasks_extracted=tasks_extracted,
-            context_used=context is not None
+            context_used=context is not None,
+            session_id=session_id
         )
         
     except HTTPException:
