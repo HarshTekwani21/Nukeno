@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import MessageBubble from './MessageBubble'
-import VoiceButton from './VoiceButton'
+import VoiceInput from './VoiceInput'
 import DailyBriefing from './DailyBriefing'
 import { api } from '../services/api'
 
@@ -12,6 +12,9 @@ const ChatUI = () => {
   const [connectionStatus, setConnectionStatus] = useState('checking')
   const [tasksExtracted, setTasksExtracted] = useState([])
   const [messageCount, setMessageCount] = useState(0)
+  const [activeTab, setActiveTab] = useState('chat')
+  const [userId] = useState(() => `user_${Date.now()}`)
+  const [sessionId] = useState(() => `session_${Date.now()}`)
   
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -68,7 +71,7 @@ const ChatUI = () => {
     setIsLoading(true)
 
     try {
-      const response = await api.chat(userMessage)
+      const response = await api.chat(userMessage, sessionId)
       
       setMessages(prev => [...prev, { 
         id: Date.now() + 1, 
@@ -248,11 +251,37 @@ const ChatUI = () => {
             }`} />
           </div>
           <div>
-            <h2 className="text-white font-semibold">Nukeno Assistant</h2>
+            <h2 className="text-white font-semibold">Nukeno</h2>
             <p className="text-xs text-gray-500">
-              {connectionStatus === 'connected' ? `${messages.length} messages • Connected` : 
+              {connectionStatus === 'connected' ? `${messages.length} messages` : 
                connectionStatus === 'error' ? 'Connection error' : 'Connecting...'}
             </p>
+          </div>
+          <div className="flex gap-2 bg-gray-800/50 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'chat' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              💬 Chat
+            </button>
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'tasks' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              ✅ Tasks
+            </button>
+            <button
+              onClick={() => setActiveTab('notes')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'notes' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              📝 Notes
+            </button>
           </div>
         </div>
         
@@ -363,8 +392,13 @@ const ChatUI = () => {
       <div className="p-4 border-t border-gray-800/50 backdrop-blur-sm bg-nukeno-dark/50">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-end gap-3">
-            <VoiceButton
-              onTranscription={handleVoiceTranscription}
+            <VoiceInput
+              onTranscript={(text) => {
+                setInput(text)
+              }}
+              onEnd={(finalText) => {
+                handleSend(finalText)
+              }}
               disabled={isLoading}
             />
             

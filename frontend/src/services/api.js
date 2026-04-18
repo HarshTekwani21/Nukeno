@@ -81,13 +81,14 @@ class APIClient {
     return new Promise(resolve => setTimeout(resolve, ms))
   }
 
-  async chat(message, sessionId = null) {
+  async chat(message, sessionId = null, userId = null) {
     return this.request('/chat', {
       method: 'POST',
       body: { 
         message, 
         use_context: true,
-        session_id: sessionId || this.sessionId
+        session_id: sessionId || this.sessionId,
+        user_id: userId || this.sessionId
       }
     })
   }
