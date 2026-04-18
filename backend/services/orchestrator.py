@@ -33,7 +33,7 @@ class TaskAgent:
         return AgentResponse("I didn't catch that. Say 'add task [name]' to create, or 'show tasks' to list.")
     
     def _is_creating(self, text: str) -> bool:
-        return any(kw in text for kw in ["add task", "create task", "new task", "add to", "task:", "todo:", "i need to", "i should", "remember to", "call ", "remind me", "remind to", "need ", "should "])
+        return any(kw in text for kw in ["add task", "create task", "new task", "add to", "task", "todo", "i need to", "i should", "remember to", "call ", "remind me", "remind to", "need ", "should "])
     
     def _is_deleting(self, text: str) -> bool:
         return any(kw in text for kw in ["delete task", "remove task", "clear task", "delete", "remove "])
@@ -54,6 +54,7 @@ class TaskAgent:
             "add a task to ",
             "add task to ",
             "create task to ",
+            "create a task to ",
             "new task to ",
             "add task: ",
             "create task: ",
@@ -65,9 +66,13 @@ class TaskAgent:
             "remind me to ",
             "add ",
             "create ",
+            "call me to ",
             "call ",
-            "need ",
+            "need to ",
             "should ",
+            "to call ",
+            "for calling ",
+            "for ",
         ]
         
         title = text_lower
@@ -268,7 +273,7 @@ class Orchestrator:
         }
     
     def _is_task_request(self, text: str) -> bool:
-        return any(kw in text for kw in ["add task", "create task", "delete task", "remove task", "complete task", "show tasks", "list tasks", "my tasks", "task:", "todo:", "call ", "remind me", "need to", "should ", "top priority"])
+        return any(kw in text for kw in ["add task", "create task", "delete task", "remove task", "complete task", "show tasks", "list tasks", "my tasks", "task", "todo", "call ", "remind me", "need to", "should ", "top priority"])
     
     def _is_note_request(self, text: str) -> bool:
         return any(kw in text for kw in ["add note", "create note", "delete note", "show notes", "list notes", "note:", "remember"])
