@@ -48,12 +48,33 @@ class TaskAgent:
         import re
         text_lower = text.lower()
         
-        # Remove all common prefixes
-        prefixes = ["add task to ", "add task:", "add a task to ", "add ", "create task to ", "create task: ", "new task: ", "call ", "remind me to ", "remind to ", "i need to ", "i should ", "remember to "]
+        # Remove longer phrases FIRST, then shorter ones
+        # Order matters! Check longer matches before shorter
+        phrases_to_remove = [
+            "add a task to ",
+            "add task to ",
+            "create task to ",
+            "new task to ",
+            "add task: ",
+            "create task: ",
+            "task: ",
+            "todo: ",
+            "i need to ",
+            "i should ",
+            "remember to ",
+            "remind me to ",
+            "add ",
+            "create ",
+            "call ",
+            "need ",
+            "should ",
+        ]
         
         title = text_lower
-        for prefix in prefixes:
-            title = title.replace(prefix, "")
+        for phrase in phrases_to_remove:
+            if title.startswith(phrase):
+                title = title[len(phrase):]
+                break
         
         # Remove time references like "7:00 PM", "at 7:00"
         title = re.sub(r'\s+(at|by|on|before)\s+\d{1,2}:\d{2}\s*(?:am|pm)?.*', '', title, flags=re.IGNORECASE)
