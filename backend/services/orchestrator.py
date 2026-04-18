@@ -33,7 +33,7 @@ class TaskAgent:
         return AgentResponse("I didn't catch that. Say 'add task [name]' to create, or 'show tasks' to list.")
     
     def _is_creating(self, text: str) -> bool:
-        return any(kw in text for kw in ["add task", "create task", "new task", "add to", "task:", "todo:", "i need to", "i should", "remember to"])
+        return any(kw in text for kw in ["add task", "create task", "new task", "add to", "task:", "todo:", "i need to", "i should", "remember to", "call ", "remind me", "remind to", "need ", "should "])
     
     def _is_deleting(self, text: str) -> bool:
         return any(kw in text for kw in ["delete task", "remove task", "clear task", "delete", "remove "])
@@ -46,20 +46,19 @@ class TaskAgent:
     
     def _extract_task_title(self, text: str) -> str:
         import re
-        patterns = [
-            r"add task[:]?\s*(.+?)(?:\s+(?:by|at|before|on)\s+|$)",
-            r"create task[:]?\s*(.+?)(?:\s+(?:by|at|before|on)\s+|$)",
-            r"task[:]\s*(.+?)(?:\s+(?:by|at|before|on)\s+|$)",
-            r"todo[:]\s*(.+?)(?:\s+(?:by|at|before|on)\s+|$)",
-            r"(?:remember to|i need to|i should)\s+(.+?)(?:\s+(?:by|at|before|on)\s+|$)",
-        ]
+        text_lower = text.lower()
         
-        for pattern in patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()[:100]
+        # Remove all common prefixes
+        prefixes = ["add task to ", "add task:", "add a task to ", "add ", "create task to ", "create task: ", "new task: ", "call ", "remind me to ", "remind to ", "i need to ", "i should ", "remember to "]
         
-        return text.replace("add task", "").replace("create task", "").replace("new task", "").strip()[:100]
+        title = text_lower
+        for prefix in prefixes:
+            title = title.replace(prefix, "")
+        
+        # Remove time references like "7:00 PM", "at 7:00"
+        title = re.sub(r'\s+(at|by|on|before)\s+\d{1,2}:\d{2}\s*(?:am|pm)?.*', '', title, flags=re.IGNORECASE)
+        
+        return title.strip()[:80] if title.strip() else "Untitled"
     
     def _extract_deadline(self, text: str) -> Optional[str]:
         import re
@@ -248,7 +247,7 @@ class Orchestrator:
         }
     
     def _is_task_request(self, text: str) -> bool:
-        return any(kw in text for kw in ["add task", "create task", "delete task", "remove task", "complete task", "show tasks", "list tasks", "my tasks", "task:", "todo:"])
+        return any(kw in text for kw in ["add task", "create task", "delete task", "remove task", "complete task", "show tasks", "list tasks", "my tasks", "task:", "todo:", "call ", "remind me", "need to", "should ", "top priority"])
     
     def _is_note_request(self, text: str) -> bool:
         return any(kw in text for kw in ["add note", "create note", "delete note", "show notes", "list notes", "note:", "remember"])
