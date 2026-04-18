@@ -5,7 +5,7 @@ load_dotenv()
 
 class Config:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL = "gemini-2.5-flash-lite"
+    GEMINI_MODEL = "gemini-2.0-flash-exp"
     GEMINI_LIVE_MODEL = "gemini-3.1-flash-live-preview"
     
     WHISPER_MODEL = "base"
