@@ -81,6 +81,11 @@ const ChatUI = () => {
         status: 'received'
       }])
 
+      // Auto-speak the response using browser TTS
+      if (response.response) {
+        useFallbackTTS(response.response)
+      }
+
       if (response.tasks_extracted?.length > 0) {
         setTasksExtracted(response.tasks_extracted)
         typingTimeoutRef.current = setTimeout(() => setTasksExtracted([]), 5000)
@@ -267,6 +272,14 @@ const ChatUI = () => {
               💬 Chat
             </button>
             <button
+              onClick={() => setActiveTab('voice')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'voice' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🎤 Voice
+            </button>
+            <button
               onClick={() => setActiveTab('tasks')}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 activeTab === 'tasks' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
@@ -297,7 +310,30 @@ const ChatUI = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 chat-container">
-        <DailyBriefing />
+        {activeTab === 'voice' && (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="text-center mb-8">
+              <div className="w-32 h-32 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                <span className="text-6xl">🎤</span>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Voice Chat</h2>
+              <p className="text-gray-400 mb-6">Click the microphone to start talking</p>
+            </div>
+            <VoiceInput
+              onTranscript={(text) => {
+                setInput(text)
+              }}
+              onEnd={(finalText) => {
+                handleSend(finalText)
+              }}
+              disabled={isLoading}
+            />
+          </div>
+        )}
+
+        {activeTab !== 'voice' && (
+          <>
+            <DailyBriefing />
         
         {tasksExtracted.length > 0 && (
           <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
@@ -387,9 +423,10 @@ const ChatUI = () => {
         )}
 
         <div ref={messagesEndRef} className="h-4" />
-      </div>
+        </>
+        )}
 
-      <div className="p-4 border-t border-gray-800/50 backdrop-blur-sm bg-nukeno-dark/50">
+        <div className="p-4 border-t border-gray-800/50 backdrop-blur-sm bg-nukeno-dark/50">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-end gap-3">
             <VoiceInput
