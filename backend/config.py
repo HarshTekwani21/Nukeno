@@ -12,8 +12,9 @@ def _cuda_available():
 
 class Config:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL = "gemini-2.0-flash"
-    GEMINI_LIVE_MODEL = "gemini-3.1-flash-live-preview"
+    GEMINI_MODEL = "gemini-1.5-flash"
+    GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts"
+    GEMINI_TTS_VOICE = "Aoede"
 
     WHISPER_MODEL = "base"
     WHISPER_DEVICE = "cuda" if _cuda_available() else "cpu"

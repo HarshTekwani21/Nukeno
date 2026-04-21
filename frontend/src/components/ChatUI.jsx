@@ -165,10 +165,17 @@ const ChatUI = ({ selectedTask }) => {
     if (!text || !('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 1.1
-    const preferred = window.speechSynthesis.getVoices().find(v =>
-      v.name.includes('Neural') || v.name.includes('Google') || v.lang.startsWith('en-')
-    )
+    utterance.rate = 1.05
+    utterance.pitch = 1.1
+    const voices = window.speechSynthesis.getVoices()
+    const preferred =
+      voices.find(v => v.name === 'Google UK English Female') ||
+      voices.find(v => v.name === 'Microsoft Zira - English (United States)') ||
+      voices.find(v => v.name === 'Microsoft Hazel - English (Great Britain)') ||
+      voices.find(v => v.name.toLowerCase().includes('female') && v.lang.startsWith('en-')) ||
+      voices.find(v => v.name.includes('Samantha') && v.lang.startsWith('en-')) ||
+      voices.find(v => (v.name.includes('Neural') || v.name.includes('Google')) && v.lang.startsWith('en-')) ||
+      voices.find(v => v.lang.startsWith('en-'))
     if (preferred) utterance.voice = preferred
     setIsSpeaking(true)
     utterance.onend = () => setIsSpeaking(false)
