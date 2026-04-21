@@ -7,10 +7,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        'nukeno-dark': '#0a0a0f',
-        'nukeno-gray': '#1a1a2e',
-        'nukeno-accent': '#6366f1',
-        'nukeno-accent-light': '#818cf8',
+        'nukeno-navy':    '#0b0d1a',
+        'nukeno-surface': '#13162b',
+        'nukeno-border':  '#1e2447',
+        'nukeno-violet':  '#c84bff',
+        'nukeno-purple':  '#6e4ef2',
+        'nukeno-cyan':    '#00d4ff',
+        'nukeno-magenta': '#d94bff',
       }
     },
   },

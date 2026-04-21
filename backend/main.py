@@ -5,16 +5,18 @@ import os
 
 from config import config
 from routes import chat, voice, tasks, notes, summary
+from routes import notifications
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(os.path.dirname(config.DB_PATH), exist_ok=True)
+    print(f"Nukeno API v2 starting — Whisper: {config.WHISPER_DEVICE} ({config.WHISPER_COMPUTE_TYPE})")
     yield
 
 app = FastAPI(
     title="Nukeno API",
     description="AI Assistant System",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -32,18 +34,19 @@ app.include_router(voice.router)
 app.include_router(tasks.router)
 app.include_router(notes.router)
 app.include_router(summary.router)
+app.include_router(notifications.router)
 
 @app.get("/")
 async def root():
-    return {
-        "name": "Nukeno",
-        "version": "1.0.0",
-        "status": "running"
-    }
+    return {"name": "Nukeno", "version": "2.0.0", "status": "running"}
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "whisper_device": config.WHISPER_DEVICE,
+        "whisper_compute_type": config.WHISPER_COMPUTE_TYPE
+    }
 
 if __name__ == "__main__":
     import uvicorn

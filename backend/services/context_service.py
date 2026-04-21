@@ -84,15 +84,17 @@ class ContextService:
                 except:
                     pass
         
-        upcoming_deadlines = sorted(all_deadlines, key=lambda x: x["deadlines_until"] if "deadlines_until" in x else x.get("days_until", 999))[:5]
-        
+        upcoming_deadlines = sorted(all_deadlines, key=lambda x: x.get("days_until", 999))[:5]
+
         return {
             "total_tasks": len(tasks),
             "high_priority_count": len(high_priority),
             "overdue_count": len(overdue),
             "due_today_count": len(today),
+            "upcoming_count": len(today),
             "overdue_tasks": overdue[:3],
             "today_tasks": today[:3],
+            "upcoming_tasks": today[:3],
             "high_priority_tasks": high_priority[:5],
             "upcoming_deadlines": upcoming_deadlines,
             "notes_count": len(notes),
