@@ -6,7 +6,7 @@ load_dotenv()
 def _cuda_available():
     try:
         import ctranslate2
-        return "cuda" in ctranslate2.get_supported_compute_types("cuda")
+        return ctranslate2.get_cuda_device_count() > 0
     except Exception:
         return False
 
