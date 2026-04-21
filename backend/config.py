@@ -20,8 +20,6 @@ class Config:
     WHISPER_DEVICE = "cuda" if _cuda_available() else "cpu"
     WHISPER_COMPUTE_TYPE = "float16" if WHISPER_DEVICE == "cuda" else "int8"
 
-    DB_PATH = "nukeno/backend/db/data.json"
-
     CORS_ORIGINS = [
         "http://localhost:5173",
         "http://localhost:3000",

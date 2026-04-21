@@ -40,7 +40,7 @@ const ChatUI = ({ selectedTask }) => {
 
   const checkConnection = async () => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:10000'
+      const apiUrl = import.meta.env.VITE_API_URL || ''
       const res = await fetch(`${apiUrl}/health`)
       if (res.ok) {
         const data = await res.json()
@@ -161,10 +161,28 @@ const ChatUI = ({ selectedTask }) => {
     }
   }
 
+  const stripMarkdown = (text) => {
+    return text
+      .replace(/```[\s\S]*?```/g, '')       // code blocks
+      .replace(/`[^`]*`/g, '')              // inline code
+      .replace(/\*\*([^*]+)\*\*/g, '$1')   // bold
+      .replace(/\*([^*]+)\*/g, '$1')        // italic
+      .replace(/^#{1,6}\s+/gm, '')          // headings
+      .replace(/^\s*[-*+]\s+/gm, '')        // bullet lists
+      .replace(/^\s*\d+\.\s+/gm, '')        // numbered lists
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // links
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, '') // images
+      .replace(/\n{2,}/g, '. ')             // paragraph breaks → pause
+      .replace(/\n/g, ' ')
+      .replace(/[*_~>#|]/g, '')             // remaining symbols
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
   const useFallbackTTS = (text) => {
     if (!text || !('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
+    const utterance = new SpeechSynthesisUtterance(stripMarkdown(text))
     utterance.rate = 1.05
     utterance.pitch = 1.1
     const voices = window.speechSynthesis.getVoices()

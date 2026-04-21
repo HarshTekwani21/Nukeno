@@ -1,169 +1,180 @@
-import json
+import sqlite3
 import os
 from typing import Dict, List, Optional
 from datetime import datetime
-from config import config
-import asyncio
 from pathlib import Path
 
+_DB_PATH = Path(__file__).parent / "nukeno.db"
+
+
+def _get_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _init_db():
+    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _get_conn() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id          TEXT PRIMARY KEY,
+                title       TEXT NOT NULL,
+                priority    TEXT NOT NULL DEFAULT 'medium',
+                deadline    TEXT,
+                completed   INTEGER NOT NULL DEFAULT 0,
+                completed_at TEXT,
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS notes (
+                id          TEXT PRIMARY KEY,
+                title       TEXT NOT NULL,
+                content     TEXT NOT NULL DEFAULT '',
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL
+            );
+        """)
+
+
+def _task_row_to_dict(row) -> Dict:
+    d = dict(row)
+    d["completed"] = bool(d["completed"])
+    return d
+
+
+def _note_row_to_dict(row) -> Dict:
+    return dict(row)
+
+
+_init_db()
+
+
 class Storage:
-    def __init__(self):
-        self.db_path = Path(config.DB_PATH)
-        self._lock = asyncio.Lock()
-        self._ensure_db()
-
-    def _ensure_db(self):
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.db_path.exists():
-            self._save({"tasks": [], "notes": []})
-
-    def _load(self) -> Dict:
-        try:
-            if self.db_path.exists():
-                with open(self.db_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Storage load error: {e}")
-        return {"tasks": [], "notes": []}
-
-    def _save(self, data: Dict):
-        try:
-            with open(self.db_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        except IOError as e:
-            print(f"Storage save error: {e}")
-
     def get_tasks(self, include_completed: bool = True) -> List[Dict]:
-        data = self._load()
-        tasks = data.get("tasks", [])
-        
-        if not include_completed:
-            tasks = [t for t in tasks if not t.get("completed")]
-        
-        return tasks
+        with _get_conn() as conn:
+            if include_completed:
+                rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE completed = 0 ORDER BY created_at DESC"
+                ).fetchall()
+        return [_task_row_to_dict(r) for r in rows]
 
     def get_task_by_id(self, task_id: str) -> Optional[Dict]:
-        tasks = self.get_tasks()
-        return next((t for t in tasks if t.get("id") == task_id), None)
+        with _get_conn() as conn:
+            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return _task_row_to_dict(row) if row else None
 
     def add_task(self, task: Dict) -> Dict:
-        data = self._load()
-        
-        task["id"] = str(datetime.now().timestamp())
-        task["created_at"] = datetime.now().isoformat()
-        task["updated_at"] = task["created_at"]
-        
-        if "priority" not in task:
-            task["priority"] = "medium"
-        
-        if "completed" not in task:
-            task["completed"] = False
-        
-        data["tasks"].append(task)
-        self._save(data)
-        
-        return task
+        now = datetime.now().isoformat()
+        task_id = str(datetime.now().timestamp())
+        priority = task.get("priority", "medium")
+        with _get_conn() as conn:
+            conn.execute(
+                """INSERT INTO tasks (id, title, priority, deadline, completed, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 0, ?, ?)""",
+                (task_id, task["title"], priority, task.get("deadline"), now, now),
+            )
+        return self.get_task_by_id(task_id)
 
     def update_task(self, task_id: str, updates: Dict) -> Optional[Dict]:
-        data = self._load()
-        
-        for i, task in enumerate(data["tasks"]):
-            if task.get("id") == task_id:
-                data["tasks"][i].update(updates)
-                data["tasks"][i]["updated_at"] = datetime.now().isoformat()
-                self._save(data)
-                return data["tasks"][i]
-        
-        return None
+        if not updates:
+            return self.get_task_by_id(task_id)
+        now = datetime.now().isoformat()
+        allowed = {"title", "priority", "deadline", "completed", "completed_at"}
+        cols = {k: v for k, v in updates.items() if k in allowed}
+        cols["updated_at"] = now
+        set_clause = ", ".join(f"{k} = ?" for k in cols)
+        values = list(cols.values()) + [task_id]
+        with _get_conn() as conn:
+            cur = conn.execute(f"UPDATE tasks SET {set_clause} WHERE id = ?", values)
+            if cur.rowcount == 0:
+                return None
+        return self.get_task_by_id(task_id)
 
     def delete_task(self, task_id: str) -> bool:
-        data = self._load()
-        original_len = len(data["tasks"])
-        data["tasks"] = [t for t in data["tasks"] if t.get("id") != task_id]
-        
-        if len(data["tasks"]) < original_len:
-            self._save(data)
-            return True
-        
-        return False
+        with _get_conn() as conn:
+            cur = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        return cur.rowcount > 0
 
     def complete_task(self, task_id: str) -> Optional[Dict]:
-        return self.update_task(task_id, {"completed": True, "completed_at": datetime.now().isoformat()})
+        return self.update_task(
+            task_id,
+            {"completed": True, "completed_at": datetime.now().isoformat()},
+        )
 
     def get_notes(self, limit: Optional[int] = None) -> List[Dict]:
-        data = self._load()
-        notes = data.get("notes", [])
-        
-        if limit:
-            notes = notes[-limit:]
-        
-        return notes
+        with _get_conn() as conn:
+            if limit:
+                rows = conn.execute(
+                    "SELECT * FROM notes ORDER BY created_at DESC LIMIT ?", (limit,)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM notes ORDER BY created_at DESC"
+                ).fetchall()
+        return [_note_row_to_dict(r) for r in rows]
 
     def get_note_by_id(self, note_id: str) -> Optional[Dict]:
-        notes = self.get_notes()
-        return next((n for n in notes if n.get("id") == note_id), None)
+        with _get_conn() as conn:
+            row = conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
+        return _note_row_to_dict(row) if row else None
 
     def add_note(self, note: Dict) -> Dict:
-        data = self._load()
-        
-        note["id"] = str(datetime.now().timestamp())
-        note["created_at"] = datetime.now().isoformat()
-        note["updated_at"] = note["created_at"]
-        
-        data["notes"].append(note)
-        self._save(data)
-        
-        return note
+        now = datetime.now().isoformat()
+        note_id = str(datetime.now().timestamp())
+        with _get_conn() as conn:
+            conn.execute(
+                "INSERT INTO notes (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                (note_id, note["title"], note.get("content", ""), now, now),
+            )
+        return self.get_note_by_id(note_id)
 
     def update_note(self, note_id: str, updates: Dict) -> Optional[Dict]:
-        data = self._load()
-        
-        for i, note in enumerate(data["notes"]):
-            if note.get("id") == note_id:
-                data["notes"][i].update(updates)
-                data["notes"][i]["updated_at"] = datetime.now().isoformat()
-                self._save(data)
-                return data["notes"][i]
-        
-        return None
+        if not updates:
+            return self.get_note_by_id(note_id)
+        now = datetime.now().isoformat()
+        allowed = {"title", "content"}
+        cols = {k: v for k, v in updates.items() if k in allowed}
+        cols["updated_at"] = now
+        set_clause = ", ".join(f"{k} = ?" for k in cols)
+        values = list(cols.values()) + [note_id]
+        with _get_conn() as conn:
+            cur = conn.execute(f"UPDATE notes SET {set_clause} WHERE id = ?", values)
+            if cur.rowcount == 0:
+                return None
+        return self.get_note_by_id(note_id)
 
     def delete_note(self, note_id: str) -> bool:
-        data = self._load()
-        original_len = len(data["notes"])
-        data["notes"] = [n for n in data["notes"] if n.get("id") != note_id]
-        
-        if len(data["notes"]) < original_len:
-            self._save(data)
-            return True
-        
-        return False
+        with _get_conn() as conn:
+            cur = conn.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+        return cur.rowcount > 0
 
     def search_notes(self, query: str) -> List[Dict]:
-        notes = self.get_notes()
-        query_lower = query.lower()
-        
-        results = []
-        for note in notes:
-            if (query_lower in note.get("title", "").lower() or 
-                query_lower in note.get("content", "").lower()):
-                results.append(note)
-        
-        return results
+        q = f"%{query.lower()}%"
+        with _get_conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM notes WHERE LOWER(title) LIKE ? OR LOWER(content) LIKE ? ORDER BY created_at DESC",
+                (q, q),
+            ).fetchall()
+        return [_note_row_to_dict(r) for r in rows]
 
     def get_stats(self) -> Dict:
-        data = self._load()
-        tasks = data.get("tasks", [])
-        notes = data.get("notes", [])
-        
-        completed = len([t for t in tasks if t.get("completed")])
-        high_priority = len([t for t in tasks if t.get("priority") == "high" and not t.get("completed")])
-        
+        with _get_conn() as conn:
+            total_tasks = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+            completed = conn.execute("SELECT COUNT(*) FROM tasks WHERE completed = 1").fetchone()[0]
+            high_priority = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE priority = 'high' AND completed = 0"
+            ).fetchone()[0]
+            total_notes = conn.execute("SELECT COUNT(*) FROM notes").fetchone()[0]
         return {
-            "total_tasks": len(tasks),
+            "total_tasks": total_tasks,
             "completed_tasks": completed,
-            "pending_tasks": len(tasks) - completed,
+            "pending_tasks": total_tasks - completed,
             "high_priority_tasks": high_priority,
-            "total_notes": len(notes)
+            "total_notes": total_notes,
         }
+
 
 storage = Storage()
