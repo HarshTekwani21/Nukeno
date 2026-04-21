@@ -1,10 +1,9 @@
-import os
-import json
 import google.generativeai as genai
 from google.generativeai import types
 from typing import Optional, Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime
 from config import config
+
 
 class GeminiService:
     SYSTEM_PROMPT = """You are Nukeno, a smart AI assistant with web search.
@@ -30,11 +29,7 @@ RESPOND NATURALLY:
         if not api_key:
             raise ValueError("GEMINI_API_KEY is required")
         genai.configure(api_key=api_key)
-        
-        self.model = genai.GenerativeModel(
-            config.GEMINI_MODEL,
-            tools=[genai.prototypes.SearchToolbank.get_tool('search')]
-        )
+
         self._safety_settings = {
             'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
             'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
@@ -42,64 +37,106 @@ RESPOND NATURALLY:
             'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE',
         }
 
+        self._search_tools = self._build_search_tools()
+
+        self.model = genai.GenerativeModel(
+            config.GEMINI_MODEL,
+            tools=self._search_tools or None,
+            system_instruction=self.SYSTEM_PROMPT
+        )
+
+    def _build_search_tools(self) -> list:
+        """Try to build Google Search grounding tool; fall back to no tools."""
+        try:
+            tool = types.Tool(
+                google_search_retrieval=types.GoogleSearchRetrieval(
+                    dynamic_retrieval_config=types.DynamicRetrievalConfig(
+                        mode=types.DynamicRetrievalConfig.Mode.MODE_DYNAMIC,
+                        dynamic_threshold=0.3,
+                    )
+                )
+            )
+            return [tool]
+        except AttributeError:
+            pass
+
+        try:
+            # Fallback for older type layouts
+            tool = types.Tool(google_search_retrieval=types.GoogleSearchRetrieval())
+            return [tool]
+        except Exception:
+            pass
+
+        return []
+
     def _build_context_string(self, context: Optional[Dict]) -> str:
         if not context:
             return ""
-        
+
         parts = []
-        
         if tasks := context.get("tasks"):
             high = [t for t in tasks if t.get("priority") == "high" and not t.get("completed")]
             if high:
                 parts.append(f"🔴 HIGH PRIORITY: {', '.join([t['title'] for t in high[:3]])}")
-        
+
         if summary := context.get("summary"):
             total = summary.get("total_tasks", 0)
             if total > 0:
                 parts.append(f"Tasks: {total} total ({summary.get('high_priority_count', 0)} high)")
-        
+
         return "\n".join(parts) if parts else ""
 
     def generate_response(self, user_input: str, context: Optional[Dict] = None, history: str = "") -> str:
         context_str = self._build_context_string(context)
-        
-        parts = [self.SYSTEM_PROMPT]
+
+        parts = []
         if history:
-            parts.append(f"\nConversation:\n{history}")
+            parts.append(f"Conversation:\n{history}")
         if context_str:
-            parts.append(f"\nCurrent context:\n{context_str}")
-        parts.append(f"\nUser: {user_input}\nNukeno:")
-        
-        full_prompt = "\n\n".join(parts)
-        
+            parts.append(f"Current context:\n{context_str}")
+        parts.append(f"User: {user_input}\nNukeno:")
+
+        prompt = "\n\n".join(parts)
+
         try:
             response = self.model.generate_content(
-                full_prompt,
-                tools=[genai.prototypes.SearchToolbank.get_tool('search')],
+                prompt,
                 safety_settings=self._safety_settings,
-                generation_config={
-                    "temperature": 0.85,
-                    "max_output_tokens": 250,
-                }
+                generation_config=genai.GenerationConfig(
+                    temperature=0.85,
+                    max_output_tokens=300,
+                ),
             )
-            
-            # Check if model wanted to search
-            if response.candidates and hasattr(response.candidates[0], 'content'):
-                candidate = response.candidates[0]
-                if candidate.content and candidate.content.parts:
-                    for part in candidate.content.parts:
-                        if hasattr(part, 'function_call') or hasattr(part, 'text'):
-                            if hasattr(part, 'text') and part.text:
-                                return part.text.strip()
-            
-            # Fallback to text response
+
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'text') and part.text:
+                        return part.text.strip()
+
             if hasattr(response, 'text') and response.text:
                 return response.text.strip()
-            
-            return "I'm thinking... Ask me something else!"
-            
+
+            return "I'm here! Ask me anything."
+
         except Exception as e:
             print(f"Gemini error: {e}")
-            return f"I encountered an issue. Let's try again!"
+            return "I encountered an issue. Please try again!"
+
+    def extract_tasks(self, user_input: str) -> List[Dict]:
+        """Extract structured task data from natural language."""
+        prompt = f"""Extract tasks from: "{user_input}"
+Return JSON array like: [{{"title":"...", "priority":"high|medium|low", "deadline":"ISO or null"}}]
+Return [] if no tasks. Only JSON, no explanation."""
+
+        try:
+            simple_model = genai.GenerativeModel(config.GEMINI_MODEL)
+            response = simple_model.generate_content(prompt)
+            text = response.text.strip()
+            text = text.replace("```json", "").replace("```", "").strip()
+            return __import__('json').loads(text)
+        except Exception as e:
+            print(f"Task extraction error: {e}")
+            return []
+
 
 gemini_service = GeminiService()
