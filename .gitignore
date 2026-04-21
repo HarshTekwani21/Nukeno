@@ -4,8 +4,9 @@ venv/
 __pycache__/
 *.pyc
 node_modules/
-dist/
 build/
+backend/nukeno_env/
+backend/venv/
 
 # IDE
 .vscode/
