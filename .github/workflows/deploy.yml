@@ -22,14 +22,6 @@ jobs:
         with:
           project_id: nukeno-deploy
 
-      # ── Enable required APIs ───────────────────────────────────────────────
-      - name: Enable Cloud Run & Cloud Build APIs
-        run: |
-          gcloud services enable run.googleapis.com \
-            cloudbuild.googleapis.com \
-            artifactregistry.googleapis.com \
-            --project nukeno-deploy
-
       # ── Deploy FastAPI backend to Cloud Run ────────────────────────────────
       - name: Deploy backend to Cloud Run
         run: |
